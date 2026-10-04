@@ -1,6 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import Confirmation from "./confirmation";
+import {
+  ClientError,
+  requestJson,
+  userErrorMessage,
+} from "@/lib/client-errors";
 type Row = { id: string; code: string; title: string; status: string };
 type Preview = {
   total: number;
@@ -30,16 +35,16 @@ export default function Admin() {
     [preview, setPreview] = useState<Preview | null>(null),
     [confirm, setConfirm] = useState<"import" | "archive" | null>(null);
   async function load() {
-    const r = await fetch(
+    const { response: r, data: d } = await requestJson(
       `/api/admin?q=${encodeURIComponent(q)}&status=${status}&page=${page}`,
       { cache: "no-store" },
     );
-    const d = await r.json();
+
     if (r.status === 401) {
       setLogged(false);
       return;
     }
-    if (!r.ok) throw new Error(d.error);
+    if (!r.ok) throw new ClientError(d.error);
     setLogged(true);
     setRows(d.rows);
     setCounts(d.counts);
@@ -47,17 +52,17 @@ export default function Admin() {
     setSelected([]);
   }
   useEffect(() => {
-    void load().catch((e) => setError(e.message));
+    void load().catch((e) => setError(userErrorMessage(e)));
   }, [page, status]);
   async function action(body: unknown) {
-    const r = await fetch("/api/admin", {
+    const { response: r, data: d } = await requestJson("/api/admin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const d = await r.json();
+
     if (r.status === 401) setLogged(false);
-    if (!r.ok) throw new Error(d.error);
+    if (!r.ok) throw new ClientError(d.error);
     return d;
   }
   async function run(fn: () => Promise<void>) {
@@ -68,7 +73,7 @@ export default function Admin() {
     try {
       await fn();
     } catch (e) {
-      setError((e as Error).message);
+      setError(userErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -299,7 +304,7 @@ export default function Admin() {
                   if (file)
                     void run(async () => {
                       if (file.size > 10485760)
-                        throw new Error("Failas per didelis.");
+                        throw new ClientError("Failas per didelis.");
                       const text = await file.text();
                       setCsv(text);
                       setPreview(

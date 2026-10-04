@@ -126,9 +126,9 @@ test(
               where: { id: g.id },
               data: { status: "allocated" },
             });
-            throw new Error("rollback");
+            throw new Error("Transakcija atšaukta.");
           }),
-          /rollback/,
+          /Transakcija atšaukta/,
         );
         assert.equal(
           (await db.gift.findUniqueOrThrow({ where: { id: g.id } })).status,

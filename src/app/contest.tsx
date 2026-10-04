@@ -7,6 +7,11 @@ import {
   vilniusDate,
 } from "@/lib/validation";
 import { demoNotice } from "@/lib/config";
+import {
+  ClientError,
+  requestJson,
+  userErrorMessage,
+} from "@/lib/client-errors";
 type Channel = keyof typeof labels;
 type Result = { id: string; email: string; delayed: boolean };
 export default function Contest({
@@ -36,23 +41,25 @@ export default function Contest({
       consent: { text: "", version: "" },
     });
   async function api(action: string, input?: unknown) {
-    const r = await fetch("/api/contest", {
+    const { response: r, data } = await requestJson("/api/contest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, input }),
     });
-    const data = await r.json();
+
     if (!r.ok) {
       setFields(data.fields || {});
-      throw new Error(data.error);
+      throw new ClientError(data.error);
     }
     return data;
   }
   async function load() {
     try {
-      const r = await fetch("/api/contest", { cache: "no-store" });
-      const d = await r.json();
-      if (!r.ok) throw new Error(d.error);
+      const { response: r, data } = await requestJson("/api/contest", {
+        cache: "no-store",
+      });
+      const d = data;
+      if (!r.ok) throw new ClientError(d.error);
       setSettings(d);
       if (d.claim) {
         setResult(d.claim);
@@ -62,7 +69,7 @@ export default function Contest({
         setStep(3);
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(userErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -82,7 +89,7 @@ export default function Contest({
     try {
       await fn();
     } catch (e) {
-      setError((e as Error).message || "Bandykite vėliau.");
+      setError(userErrorMessage(e));
     } finally {
       setBusy(false);
     }

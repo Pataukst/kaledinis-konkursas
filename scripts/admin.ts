@@ -1,3 +1,4 @@
+import { CommandError, commandErrorMessage } from "../src/lib/cli-errors";
 import { db } from "../src/lib/db";
 import { passwordHash } from "../src/lib/security";
 import { createInterface } from "node:readline/promises";
@@ -5,9 +6,10 @@ async function main() {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const username = (await rl.question("Administratoriaus vardas: ")).trim();
   rl.close();
-  if (!username || username.length > 100) throw new Error("Netinkamas vardas.");
+  if (!username || username.length > 100)
+    throw new CommandError("Netinkamas vardas.");
   if (!process.stdin.isTTY)
-    throw new Error("Slaptažodžiui būtinas interaktyvus terminalas.");
+    throw new CommandError("Slaptažodžiui būtinas interaktyvus terminalas.");
   process.stdout.write("Slaptažodis (bent 14 simbolių, įvestis paslėpta): ");
   process.stdin.setRawMode(true);
   process.stdin.resume();
@@ -23,7 +25,7 @@ async function main() {
           return;
         }
         if (ch === "\u0003") {
-          reject(new Error("Nutraukta."));
+          reject(new CommandError("Nutraukta."));
           return;
         }
         if (ch === "\u007f" || ch === "\b") password = password.slice(0, -1);
@@ -33,7 +35,7 @@ async function main() {
     process.stdin.on("data", listener);
   });
   if (password.length < 14 || password.length > 200)
-    throw new Error("Slaptažodis turi būti 14–200 simbolių.");
+    throw new CommandError("Slaptažodis turi būti 14–200 simbolių.");
   await db.admin.create({
     data: { username, passwordHash: passwordHash(password) },
   });
@@ -41,7 +43,7 @@ async function main() {
 }
 main()
   .catch((e) => {
-    console.error(e.message);
+    console.error(commandErrorMessage(e));
     process.exitCode = 1;
   })
   .finally(() => db.$disconnect());

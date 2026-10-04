@@ -222,3 +222,13 @@ Patikrinę atkurtą kopiją IT gali suplanuoti kontroliuojamą pakeitimą. Nenau
 5. Patvirtinti organizatoriaus informaciją, taisykles, privatumo nuorodą ir sutikimo tekstą / versiją. Nenustatyti kampanijos datų, prizų verčių ar teisinių sąlygų be užsakovo patvirtinimo.
 6. Atskirai patvirtinti asmens duomenų ir atsarginių kopijų saugojimo terminus bei teisėtą sutikimo saugojimo / pašalinimo procesą. Inventoriaus archyvavimas nėra klientų duomenų ištrynimas. Ši programa sąmoningai nenustato neriboto teisėto saugojimo termino.
 7. IT: HTTPS, vieša klientų prieiga, privati DB ir vidiniai API, saugus paslapčių tiekimas, atsarginės kopijos, worker / klaidų stebėjimas ir papildomi proxy srauto limitai. Dabartiniai DB limitai: 20 contest POST / sesiją / min., 300 bendrų contest POST / min., 1200 sesijos skaitymų / min.; admin prisijungimai 5 / vardą ir 20 bendrai per 15 min.; admin operacijos 30 / paskyrą / min. Netikėti srautai nepasitikimi `X-Forwarded-For`; patikimų proxy IP limitus sukonfigūruoja IT.
+
+## Klaidų pranešimų kalba
+
+Bendroji Zod validavimo kalba – lietuvių; laukams taikomi konkretūs lietuviški pranešimai. Kliento ir administravimo tinklo bei netinkamo serverio atsakymo klaidos apdorojamos `src/lib/client-errors.ts`, komandų klaidos – `src/lib/cli-errors.ts`. Nežinomos techninės išimtys nerodomos dalyviui. Nerastas puslapis ir netikėtos puslapio / pagrindinio išdėstymo klaidos taip pat pateikiamos lietuviškai.
+
+Paleidus vietinę svetainę, papildoma naršyklės patikra:
+
+```powershell
+npx tsx tests/browser-errors.ts
+```

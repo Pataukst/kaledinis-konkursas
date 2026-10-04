@@ -22,3 +22,6 @@ DB scenarijai tikrina nepatvirtintą / pasibaigusį pirkimą, aštuonis vienu me
 Pirmieji build bandymai aptiko TypeScript klaidas; jos ištaisytos prieš sėkmingą galutinį build. Vienas vėlesnis bandymas negalėjo pakeisti Prisma Windows DLL, kol veikė dev serveris; sustabdžius tą procesą build išlaikytas. Pirmame naršyklės teste per platus alert selektorius sutapo su Next route announcer; selektorius patikslintas ir visos patikros pakartotos sėkmingai.
 
 Tai vietinio veikimo patikra, ne realių API, produkcijos infrastruktūros, didelio srauto ar patvirtintų teisinių dokumentų auditas. Likę paleidimo darbai išvardyti README.
+## Papildoma lietuviškų klaidų patikra (2026-10-04)
+
+Po klaidų pranešimų atnaujinimo `npm test` išlaikė 10 testų; DB grupė, kuri šiam kalbos pakeitimui nebuvo vykdoma, sąmoningai praleista. `tests/browser-errors.ts` naršyklėje patikrino lietuviškus kliento ir administravimo tinklo klaidų, netinkamo JSON / serverio atsakymo ir nerasto puslapio pranešimus. `npx next build --webpack` sėkmingai atliko galutinę produkcijos kompiliaciją ir TypeScript patikrą. Prisma schema nekeista, todėl šiame build nebuvo iš naujo generuojamas jau veikiantis klientas.

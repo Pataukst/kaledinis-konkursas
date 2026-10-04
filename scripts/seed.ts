@@ -1,3 +1,4 @@
+import { CommandError, commandErrorMessage } from "../src/lib/cli-errors";
 import { db } from "../src/lib/db";
 async function main() {
   if (
@@ -5,7 +6,7 @@ async function main() {
     process.env.PURCHASE_ADAPTER !== "mock" ||
     process.env.DELIVERY_ADAPTER !== "mock"
   )
-    throw new Error(
+    throw new CommandError(
       "Testiniai duomenys leidžiami tik kūrimo aplinkoje su abiem imitacijomis.",
     );
   await db.gift.createMany({
@@ -19,7 +20,7 @@ async function main() {
 }
 main()
   .catch((e) => {
-    console.error(e.message);
+    console.error(commandErrorMessage(e));
     process.exitCode = 1;
   })
   .finally(() => db.$disconnect());

@@ -1,6 +1,8 @@
 import { z } from "zod";
+
+z.config(z.locales.lt());
 export const emailSchema = z
-  .string()
+  .string({ error: "Užpildykite šį lauką tekstu." })
   .trim()
   .max(254, "El. pašto adresas per ilgas.")
   .email("Įveskite galiojantį el. pašto adresą.")
@@ -26,7 +28,7 @@ export function validDate(s: string, now = new Date()) {
 }
 export function purchaseSchema(max = 128) {
   const id = z
-    .string()
+    .string({ error: "Užpildykite šį lauką tekstu." })
     .trim()
     .min(1, "Užpildykite šį lauką.")
     .max(max, `Galima įvesti iki ${max} simbolių.`);
@@ -41,7 +43,7 @@ export function purchaseSchema(max = 128) {
       channel: z.literal("retail"),
       barcode: id,
       purchaseDate: z
-        .string()
+        .string({ error: "Užpildykite šį lauką tekstu." })
         .refine(
           (s) => validDate(s),
           "Įveskite tikrą pirkimo datą, ne vėlesnę nei šiandien.",
@@ -52,12 +54,26 @@ export function purchaseSchema(max = 128) {
 export type Purchase = z.infer<ReturnType<typeof purchaseSchema>>;
 export const claimSchema = z.object({
   email: emailSchema,
-  box: z.number().int().min(1).max(5),
+  box: z
+    .number({ error: "Pasirinkite vieną iš penkių dovanų." })
+    .int("Pasirinkite vieną iš penkių dovanų.")
+    .min(1, "Pasirinkite vieną iš penkių dovanų.")
+    .max(5, "Pasirinkite vieną iš penkių dovanų."),
   consent: z.literal(true, {
     error: "Norėdami dalyvauti, patvirtinkite sutikimą.",
   }),
-  consentVersion: z.string().min(1).max(128),
-  consentText: z.string().min(1).max(4096),
+  consentVersion: z
+    .string({
+      error: "Atnaujinkite puslapį ir patvirtinkite sutikimą iš naujo.",
+    })
+    .min(1, "Trūksta sutikimo versijos. Atnaujinkite puslapį.")
+    .max(128, "Netinkama sutikimo versija. Atnaujinkite puslapį."),
+  consentText: z
+    .string({
+      error: "Atnaujinkite puslapį ir patvirtinkite sutikimą iš naujo.",
+    })
+    .min(1, "Trūksta sutikimo teksto. Atnaujinkite puslapį.")
+    .max(4096, "Sutikimo tekstas per ilgas. Atnaujinkite puslapį."),
   requestKey: z.uuid("Netinkamas užklausos identifikatorius."),
 });
 export const labels = {

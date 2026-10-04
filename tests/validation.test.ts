@@ -34,7 +34,7 @@ test("Kanalų laukai ir pradiniai nuliai", () => {
     barcode: " 000001 ",
     receiptNumber: "00002",
   });
-  if (p.channel !== "shop") throw new Error("channel");
+  if (p.channel !== "shop") throw new Error("Netinkamas pirkimo kanalas.");
   assert.equal(p.barcode, "000001");
   assert.equal(p.receiptNumber, "00002");
   assert.equal(
