@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Gift {
+  id        String   @id @default(uuid())
+  code      String   @unique
+  title     String
+  status    String   @default("available")
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+  claim     Claim?
+
+  @@index([status])
+}
+
+model Visitor {
+  id          String       @id
+  expiresAt   DateTime     @db.Timestamptz(3)
+  eligibility Eligibility?
+  claims      Claim[]
+}
+
+model Eligibility {
+  id          String   @id @default(uuid())
+  sessionId   String   @unique
+  session     Visitor  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  purchaseId  String
+  channel     String
+  fingerprint String
+  expiresAt   DateTime @db.Timestamptz(3)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+}
+
+model Claim {
+  id             String       @id @default(uuid())
+  sessionId      String
+  session        Visitor      @relation(fields: [sessionId], references: [id])
+  email          String       @unique
+  purchaseId     String       @unique
+  giftId         String       @unique
+  gift           Gift         @relation(fields: [giftId], references: [id])
+  box            Int
+  consentText    String
+  consentVersion String
+  consentAt      DateTime     @default(now()) @db.Timestamptz(3)
+  requestKey     String
+  requestHash    String
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  job            DeliveryJob?
+
+  @@unique([sessionId, requestKey])
+}
+
+model DeliveryJob {
+  id             String    @id @default(uuid())
+  claimId        String    @unique
+  claim          Claim     @relation(fields: [claimId], references: [id])
+  idempotencyKey String    @unique
+  status         String    @default("pending")
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now()) @db.Timestamptz(3)
+  leaseUntil     DateTime? @db.Timestamptz(3)
+  leaseToken     String?
+  safeError      String?
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+
+  @@index([status, nextAttemptAt])
+}
+
+model Admin {
+  id           String         @id @default(uuid())
+  username     String         @unique
+  passwordHash String
+  sessions     AdminSession[]
+}
+
+model AdminSession {
+  id        String   @id
+  adminId   String
+  admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @db.Timestamptz(3)
+}
+
+model RateLimit {
+  key     String   @id
+  count   Int
+  resetAt DateTime @db.Timestamptz(3)
+}

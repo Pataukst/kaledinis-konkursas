@@ -1,0 +1,9 @@
+services:
+  app:
+    environment:
+      NODE_ENV: development
+    command: ["npm", "run", "dev"]
+  worker:
+    environment:
+      NODE_ENV: development
+    restart: unless-stopped
