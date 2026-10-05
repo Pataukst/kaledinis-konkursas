@@ -163,6 +163,12 @@ h2:focus {
   justify-content: space-between;
   gap: 12px;
 }
+.inventory-detail {
+  display: block;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+  color: #64756e;
+}
 .progress li {
   display: flex;
   align-items: center;

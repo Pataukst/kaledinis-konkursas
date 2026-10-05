@@ -6,7 +6,15 @@ import {
   requestJson,
   userErrorMessage,
 } from "@/lib/client-errors";
-type Row = { id: string; code: string; title: string; status: string };
+type Row = {
+  id: string;
+  code: string;
+  title: string;
+  status: string;
+  externalGiftId: string;
+  reservationExpiresAt: string | null;
+  diagnostic?: string | null;
+};
 type Preview = {
   total: number;
   rows: { code: string; title: string; line: number }[];
@@ -15,7 +23,10 @@ type Preview = {
 const statuses: Record<string, string> = {
   available: "Laisva",
   allocated: "Paskirta",
-  archived: "Pašalinta",
+  reserved: "Rezervuota",
+  pending: "Priskyrimas tikrinamas",
+  assigned: "Priskirta",
+  archived: "Archyvuota",
 };
 export default function Admin() {
   const [logged, setLogged] = useState(false),
@@ -250,6 +261,24 @@ export default function Admin() {
                         <span className={`badge ${r.status}`}>
                           {statuses[r.status]}
                         </span>
+                        <small className="inventory-detail">
+                          Dovanos ID: {r.externalGiftId}
+                        </small>
+                        {r.reservationExpiresAt && (
+                          <small className="inventory-detail">
+                            Rezervuota iki{" "}
+                            {new Intl.DateTimeFormat("lt-LT", {
+                              timeZone: "Europe/Vilnius",
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            }).format(new Date(r.reservationExpiresAt))}
+                          </small>
+                        )}
+                        {r.diagnostic && (
+                          <small className="inventory-detail">
+                            {r.diagnostic}
+                          </small>
+                        )}
                       </td>
                     </tr>
                   ))}

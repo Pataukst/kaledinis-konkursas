@@ -18,13 +18,35 @@ export function vilniusDate(now = new Date()) {
   return `${get("year")}-${get("month")}-${get("day")}`;
 }
 export function validDate(s: string, now = new Date()) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s) || s.startsWith("0000")) return false;
   const d = new Date(`${s}T12:00:00Z`);
   return (
     !isNaN(d.valueOf()) &&
     d.toISOString().slice(0, 10) === s &&
     s <= vilniusDate(now)
   );
+}
+export const barcodeLabels = [
+  ["barcode", "Dovanų kupono brūkšninis kodas"],
+  ["purchaseDate", "Pirkimo data"],
+] as const;
+export function barcodeSchema(max = 128, now = new Date()) {
+  return z
+    .object({
+      barcode: z
+        .string({ error: "Užpildykite šį lauką tekstu." })
+        .trim()
+        .min(1, "Įveskite brūkšninį kodą.")
+        .max(max, "Brūkšninis kodas per ilgas."),
+      purchaseDate: z
+        .string({ error: "Įveskite pirkimo datą." })
+        .max(10)
+        .refine(
+          (s) => validDate(s, now),
+          "Įveskite tikrą pirkimo datą, ne vėlesnę nei šiandien.",
+        ),
+    })
+    .strict();
 }
 export function purchaseSchema(max = 128) {
   const id = z

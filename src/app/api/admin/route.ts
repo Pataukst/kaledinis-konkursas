@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import {
   AppError,
@@ -19,15 +20,27 @@ import {
   archiveInventory,
 } from "@/lib/inventory";
 import { integer } from "@/lib/config";
+import { cleanup } from "@/lib/reservations";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   return endpoint(async () => {
     await requireAdmin();
+    await cleanup();
     const url = new URL(req.url);
     const q = (url.searchParams.get("q") || "").slice(0, 128);
     const status = url.searchParams.get("status") || "";
-    if (status && !["available", "allocated", "archived"].includes(status))
+    if (
+      status &&
+      ![
+        "available",
+        "allocated",
+        "archived",
+        "reserved",
+        "pending",
+        "assigned",
+      ].includes(status)
+    )
       throw new AppError(400, "Netinkama būsena.");
     const page = Math.max(
       1,
@@ -54,8 +67,30 @@ export async function GET(req: Request) {
       db.gift.count({ where }),
       db.gift.groupBy({ by: ["status"], _count: true }),
     ]);
+    const diagnostics = rows.length
+      ? await db.$queryRaw<
+          {
+            giftId: string;
+            status: string;
+            safeError: string | null;
+            attempts: number;
+          }[]
+        >`SELECT c."giftId",j.status,j."safeError",j.attempts FROM "AssignmentClaim" c JOIN "AssignmentJob" j ON j."claimId"=c.id WHERE c."giftId" IN (${Prisma.join(rows.map((r) => r.id))}) AND c.status='PENDING_ASSIGNMENT'`
+      : [];
     return {
-      rows,
+      rows: rows.map((r) => ({
+        ...r,
+        diagnostic: diagnostics.find((d) => d.giftId === r.id)
+          ? "Bandymų: " +
+            diagnostics.find((d) => d.giftId === r.id)!.attempts +
+            "; " +
+            (diagnostics.find((d) => d.giftId === r.id)!.status === "review"
+              ? "Reikia IT peržiūros"
+              : "Laukiama patvirtinimo") +
+            "; " +
+            (diagnostics.find((d) => d.giftId === r.id)!.safeError || "")
+          : null,
+      })),
       total,
       page,
       counts: Object.fromEntries(groups.map((g) => [g.status, g._count])),

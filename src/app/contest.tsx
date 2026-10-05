@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 import {
   claimSchema,
-  labels,
-  purchaseSchema,
+  barcodeLabels,
+  barcodeSchema,
   vilniusDate,
 } from "@/lib/validation";
 import { demoNotice } from "@/lib/config";
@@ -12,8 +12,8 @@ import {
   requestJson,
   userErrorMessage,
 } from "@/lib/client-errors";
-type Channel = keyof typeof labels;
-type Result = { id: string; email: string; delayed: boolean };
+type Reservation = { id: string; validationId: string; expiresAt: string };
+type Result = { id: string; email: string; delayed: boolean; status: string };
 export default function Contest({
   organiser,
   rulesUrl,
@@ -24,7 +24,9 @@ export default function Contest({
   privacyUrl: string;
 }) {
   const [step, setStep] = useState(1),
-    [channel, setChannel] = useState<Channel | "">(""),
+    [reservation, setReservation] = useState<Reservation | null>(null),
+    [remaining, setRemaining] = useState(0),
+    [timeOffset, setTimeOffset] = useState(0),
     [values, setValues] = useState<Record<string, string>>({}),
     [box, setBox] = useState(0),
     [email, setEmail] = useState(""),
@@ -49,6 +51,7 @@ export default function Contest({
 
     if (!r.ok) {
       setFields(data.fields || {});
+      if (action === "claim" && [401, 403].includes(r.status)) await load();
       throw new ClientError(data.error);
     }
     return data;
@@ -63,10 +66,30 @@ export default function Contest({
       setSettings(d);
       if (d.claim) {
         setResult(d.claim);
-        setStep(4);
-      } else if (d.eligible) {
-        setChannel(d.channel);
         setStep(3);
+      } else if (d.eligible) {
+        setReservation(d.reservation);
+        if (d.rejected) {
+          setRequestKey(crypto.randomUUID());
+          sessionStorage.removeItem("claimKey");
+          setError(
+            "Dovanos priskyrimas atmestas. Galite pateikti naują registraciją iki pradinio rezervacijos termino.",
+          );
+        }
+        setTimeOffset(Date.parse(d.serverTime) - Date.now());
+        setStep(2);
+      } else {
+        setStep(1);
+        setReservation(null);
+        setBox(0);
+        setEmail("");
+        setConsent(false);
+        setRequestKey(crypto.randomUUID());
+        sessionStorage.removeItem("claimKey");
+        if (d.expired)
+          setError(
+            "Jūsų dovanos rezervacijos laikas baigėsi. Patikrinkite pirkimą iš naujo.",
+          );
       }
     } catch (e) {
       setError(userErrorMessage(e));
@@ -81,6 +104,33 @@ export default function Contest({
   useEffect(() => {
     document.getElementById("step-title")?.focus();
   }, [step]);
+  useEffect(() => {
+    if (step !== 2 || !reservation) return;
+    let checking = false;
+    const update = () => {
+      const seconds = Math.max(
+        0,
+        Math.ceil(
+          (Date.parse(reservation.expiresAt) - Date.now() - timeOffset) / 1000,
+        ),
+      );
+      setRemaining(seconds);
+      if (!seconds && !checking) {
+        checking = true;
+        void load();
+      }
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    const verify = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", verify);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", verify);
+    };
+  }, [step, reservation, timeOffset]);
   async function run(fn: () => Promise<void>) {
     if (busy) return;
     setBusy(true);
@@ -95,17 +145,9 @@ export default function Contest({
     }
   }
   async function next() {
-    if (step === 1) {
-      if (!channel) {
-        setError("Pasirinkite, kur įsigijote dovaną.");
-        return;
-      }
-      setStep(2);
-      return;
-    }
     await run(async () => {
-      const input = { channel, ...values };
-      const p = purchaseSchema(settings.maxLength).safeParse(input);
+      const input = values;
+      const p = barcodeSchema(settings.maxLength).safeParse(input);
       if (!p.success) {
         setFields(
           Object.fromEntries(
@@ -114,8 +156,11 @@ export default function Contest({
         );
         return;
       }
-      await api("validate", p.data);
-      setStep(3);
+      const d = await api("validate", p.data);
+      setTimeOffset(Date.parse(d.serverTime) - Date.now());
+      setReservation(d.reservation);
+      setRequestKey(crypto.randomUUID());
+      setStep(2);
     });
   }
   async function back() {
@@ -124,7 +169,12 @@ export default function Contest({
       setBox(0);
       setConsent(false);
       setFields({});
-      setStep(step === 3 ? 2 : 1);
+      setReservation(null);
+      setEmail("");
+      setValues({});
+      setRequestKey(crypto.randomUUID());
+      sessionStorage.removeItem("claimKey");
+      setStep(1);
     });
   }
   async function submit(e: React.FormEvent) {
@@ -148,9 +198,13 @@ export default function Contest({
         return;
       }
       sessionStorage.setItem("claimKey", requestKey);
-      const d = await api("claim", p.data);
+      const d = await api("claim", {
+        ...p.data,
+        reservationId: reservation?.id,
+        validationId: reservation?.validationId,
+      });
       setResult(d);
-      setStep(4);
+      setStep(3);
     });
   }
   return (
@@ -172,30 +226,26 @@ export default function Contest({
         <p>Įsigijote dovaną? Pakvieskite šventinį džiaugsmą ir į savo namus.</p>
       </div>
       <section className="card" aria-label="Dalyvavimas konkurse">
-        <ol className="progress" aria-label="Keturi dalyvavimo žingsniai">
-          {["Pirkimo vieta", "Pirkimo duomenys", "Jūsų dovana", "Ačiū"].map(
-            (s, i) => (
-              <li
-                key={s}
-                className={step >= i + 1 ? "active" : ""}
-                aria-current={step === i + 1 ? "step" : undefined}
-              >
-                <span>{step > i + 1 ? "✓" : i + 1}</span>
-                <small>{s}</small>
-              </li>
-            ),
-          )}
+        <ol className="progress" aria-label="Trys dalyvavimo žingsniai">
+          {["Pirkimo duomenys", "Jūsų dovana", "Ačiū"].map((s, i) => (
+            <li
+              key={s}
+              className={step >= i + 1 ? "active" : ""}
+              aria-current={step === i + 1 ? "step" : undefined}
+            >
+              <span>{step > i + 1 ? "✓" : i + 1}</span>
+              <small>{s}</small>
+            </li>
+          ))}
         </ol>
         <div className="form-content">
-          <p className="eyebrow">{step} ŽINGSNIS IŠ 4</p>
+          <p className="eyebrow">{step} ŽINGSNIS IŠ 3</p>
           <h2 id="step-title" tabIndex={-1}>
             {step === 1
-              ? "Kur įsigijote dovaną?"
+              ? "Jūsų pirkimo duomenys"
               : step === 2
-                ? "Jūsų pirkimo duomenys"
-                : step === 3
-                  ? "Pasirinkite savo kalėdinę dovaną"
-                  : "Ačiū, kad dalyvaujate!"}
+                ? "Pasirinkite savo kalėdinę dovaną"
+                : "Ačiū, kad dalyvaujate!"}
           </h2>
           {error && (
             <div className="error" role="alert">
@@ -203,51 +253,12 @@ export default function Contest({
             </div>
           )}
           {busy && step === 1 && <p role="status">Įkeliama…</p>}
-          {!settings.allowed && !busy && step !== 4 && (
+          {!settings.allowed && !busy && step !== 3 && (
             <p className="error">
               Dalyvavimas šiuo metu negalimas. Bandykite vėliau.
             </p>
           )}
           {step === 1 && (
-            <>
-              <p>Pasirinkite pirkimo vietą ir tęskite.</p>
-              <div className="channels">
-                {(
-                  [
-                    ["online", "Internete", "⌂"],
-                    ["shop", "Mūsų parduotuvėje", "♧"],
-                    ["retail", "Pas prekybos partnerį", "◇"],
-                  ] as const
-                ).map(([c, title, icon]) => (
-                  <button
-                    key={c}
-                    className={`channel ${channel === c ? "selected" : ""}`}
-                    aria-pressed={channel === c}
-                    onClick={() => {
-                      setChannel(c);
-                      setValues({});
-                      setError("");
-                    }}
-                    disabled={busy}
-                  >
-                    <span aria-hidden="true">{icon}</span>
-                    <strong>{title}</strong>
-                    <span className="radio" aria-hidden="true">
-                      {channel === c ? "●" : "○"}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button
-                className="primary next"
-                onClick={next}
-                disabled={busy || !settings.allowed}
-              >
-                Tęsti <span aria-hidden="true">→</span>
-              </button>
-            </>
-          )}
-          {step === 2 && channel && (
             <form
               noValidate
               onSubmit={(e) => {
@@ -256,23 +267,17 @@ export default function Contest({
               }}
             >
               <p>Įveskite duomenis, nurodytus pirkimo dokumente.</p>
-              {labels[channel].map(([key, label]) => (
+              {barcodeLabels.map(([key, label]) => (
                 <div className="field" key={key}>
                   <label htmlFor={key}>{label}</label>
                   <input
                     id={key}
                     name={key}
-                    type={
-                      key === "buyerEmail"
-                        ? "email"
-                        : key === "purchaseDate"
-                          ? "date"
-                          : "text"
-                    }
+                    type={key === "purchaseDate" ? "date" : "text"}
                     max={key === "purchaseDate" ? vilniusDate() : undefined}
-                    maxLength={key === "buyerEmail" ? 254 : settings.maxLength}
+                    maxLength={settings.maxLength}
                     required
-                    autoComplete={key === "buyerEmail" ? "email" : "off"}
+                    autoComplete="off"
                     value={values[key] || ""}
                     disabled={busy}
                     aria-invalid={!!fields[key]}
@@ -302,9 +307,22 @@ export default function Contest({
               </div>
             </form>
           )}
-          {step === 3 && (
+          {step === 2 && (
             <>
               <p>Penkios dėžutės. Viena šventinė staigmena jums.</p>
+              {reservation && (
+                <p role="status">
+                  Dovana rezervuota iki{" "}
+                  {new Intl.DateTimeFormat("lt-LT", {
+                    timeZone: "Europe/Vilnius",
+                    dateStyle: "short",
+                    timeStyle: "short",
+                  }).format(new Date(reservation.expiresAt))}
+                  . Liko {Math.floor(remaining / 3600)} val.{" "}
+                  {Math.floor((remaining % 3600) / 60)} min. {remaining % 60}{" "}
+                  sek.
+                </p>
+              )}
               <div
                 className="presents"
                 role="group"
@@ -336,7 +354,7 @@ export default function Contest({
               {box > 0 && (
                 <form onSubmit={submit} noValidate>
                   <div className="field">
-                    <label htmlFor="email">Jūsų el. paštas</label>
+                    <label htmlFor="email">Gavėjo el. paštas</label>
                     <input
                       id="email"
                       type="email"
@@ -397,21 +415,24 @@ export default function Contest({
               )}
             </>
           )}
-          {step === 4 && result && (
+          {step === 3 && result && (
             <div className="result">
               <span aria-hidden="true" className="seal">
                 ✦
               </span>
               <p>
-                Jūsų dovana bus išsiųsta el. paštu{" "}
-                <strong>{result.email}</strong>.
+                {result.status === "ASSIGNED"
+                  ? "Dovana priskirta. Gavėjo el. paštas išsaugotas."
+                  : result.status === "REJECTED"
+                    ? "Dovanos priskyrimas atmestas. Atnaujinkite būseną ir bandykite su nauja registracija."
+                    : "Jūsų registracija išsaugota. Dovanos priskyrimas tikrinamas."}
               </p>
               {settings.mock && (
                 <p>Tai demonstracija. Tikras el. laiškas nebus siunčiamas.</p>
               )}
               {result.delayed && (
                 <p role="status">
-                  Jūsų registracija išsaugota. Dovanos išsiuntimas vėluoja.
+                  Dovanos priskyrimo būsena bus atnaujinta gavus patvirtinimą.
                 </p>
               )}
               <p className="muted">Linkime jaukių švenčių!</p>

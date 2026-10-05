@@ -6,6 +6,7 @@ import {
 } from "node:crypto";
 import { cookies } from "next/headers";
 import { db } from "./db";
+import { audit } from "./audit";
 export class AppError extends Error {
   constructor(
     public status: number,
@@ -47,7 +48,13 @@ export async function visitor(create = false) {
     ? await db.visitor.findUnique({ where: { id: hash(token) } })
     : null;
   if (session && session.expiresAt > new Date()) return session;
-  if (!create) throw new AppError(401, "Sesija baigėsi. Pradėkite iš naujo.");
+  if (!create) {
+    await audit(db, "authorization.rejected", {
+      scope: "visitor",
+      safeError: "SESSION_NOT_VALID",
+    });
+    throw new AppError(401, "Sesija baigėsi. Pradėkite iš naujo.");
+  }
   const raw = randomBytes(32).toString("hex");
   const v = await db.visitor.create({
     data: { id: hash(raw), expiresAt: new Date(Date.now() + 86400000) },
@@ -63,10 +70,21 @@ export async function visitor(create = false) {
 }
 export async function requireAdmin() {
   const raw = (await cookies()).get("admin")?.value;
-  if (!raw) throw new AppError(401, "Prisijunkite prie administravimo.");
+  if (!raw) {
+    await audit(db, "authorization.rejected", {
+      scope: "admin",
+      safeError: "SESSION_MISSING",
+    });
+    throw new AppError(401, "Prisijunkite prie administravimo.");
+  }
   const s = await db.adminSession.findUnique({ where: { id: hash(raw) } });
-  if (!s || s.expiresAt < new Date())
+  if (!s || s.expiresAt < new Date()) {
+    await audit(db, "authorization.rejected", {
+      scope: "admin",
+      safeError: "SESSION_NOT_VALID",
+    });
     throw new AppError(401, "Sesija baigėsi. Prisijunkite iš naujo.");
+  }
   return s;
 }
 export async function jsonBody(req: Request, max = 16384) {

@@ -1,0 +1,1 @@
+{"validation":{"valid":["TEST-001","TEST-002","0001234567890"],"invalid":"INVALID","timeout":"TIMEOUT","unavailable":"UNAVAILABLE","malformed":"MALFORMED"},"assignment":["ok","failure","timeout-before","timeout-after","malformed","swapped-guid","swapped-gift"]}

@@ -47,5 +47,15 @@ services:
       migrate:
         condition: service_completed_successfully
     restart: "no"
+  cleanup:
+    build: .
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://contest:${POSTGRES_PASSWORD}@db:5432/contest
+    command: ["npm", "run", "worker:cleanup"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
 volumes:
   database:

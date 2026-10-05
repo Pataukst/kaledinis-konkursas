@@ -8,22 +8,31 @@ datasource db {
 }
 
 model Gift {
-  id        String   @id @default(uuid())
-  code      String   @unique
-  title     String
-  status    String   @default("available")
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-  claim     Claim?
+  id                   String            @id @default(uuid())
+  code                 String            @unique
+  title                String
+  status               String            @default("available")
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  claim                Claim?
+  externalGiftId       String            @unique @default(uuid())
+  reservationExpiresAt DateTime?         @db.Timestamptz(3)
+  activeReservationId  String?           @unique
+  activeReservation    Reservation?      @relation("ActiveGiftReservation", fields: [activeReservationId], references: [id])
+  reservations         Reservation[]     @relation("GiftReservations")
+  assignments          AssignmentClaim[]
 
   @@index([status])
 }
 
 model Visitor {
-  id          String       @id
-  expiresAt   DateTime     @db.Timestamptz(3)
-  eligibility Eligibility?
-  claims      Claim[]
+  id           String            @id
+  expiresAt    DateTime          @db.Timestamptz(3)
+  eligibility  Eligibility?
+  claims       Claim[]
+  flow         Flow?
+  reservations Reservation[]
+  assignments  AssignmentClaim[]
 }
 
 model Eligibility {
@@ -92,4 +101,107 @@ model RateLimit {
   key     String   @id
   count   Int
   resetAt DateTime @db.Timestamptz(3)
+}
+
+// Partial unique indexes and append-only/protection triggers live in the SQL migrations.
+// Legacy Eligibility/Claim/DeliveryJob rows remain intact.
+model Flow {
+  id           String               @id
+  sessionId    String               @unique
+  session      Visitor              @relation(fields: [sessionId], references: [id])
+  version      Int                  @default(0)
+  validationId String?
+  updatedAt    DateTime             @default(now()) @db.Timestamptz
+  validations  PurchaseValidation[]
+  reservations Reservation[]
+}
+
+model PurchaseValidation {
+  id             String        @id
+  flowId         String
+  flow           Flow          @relation(fields: [flowId], references: [id])
+  version        Int
+  barcode        String
+  activationDate String
+  customerGuid   String
+  createdAt      DateTime      @default(now()) @db.Timestamptz
+  reservations   Reservation[]
+}
+
+model Reservation {
+  id             String             @id
+  giftId         String
+  gift           Gift               @relation("GiftReservations", fields: [giftId], references: [id])
+  activeGift     Gift?              @relation("ActiveGiftReservation")
+  validationId   String
+  validation     PurchaseValidation @relation(fields: [validationId], references: [id])
+  flowId         String
+  flow           Flow               @relation(fields: [flowId], references: [id])
+  sessionId      String
+  session        Visitor            @relation(fields: [sessionId], references: [id])
+  barcode        String
+  activationDate String
+  customerGuid   String
+  status         String
+  reservedAt     DateTime           @db.Timestamptz
+  expiresAt      DateTime           @db.Timestamptz
+  assignments    AssignmentClaim[]
+}
+
+model AssignmentClaim {
+  id             String         @id
+  reservationId  String
+  reservation    Reservation    @relation(fields: [reservationId], references: [id])
+  sessionId      String
+  session        Visitor        @relation(fields: [sessionId], references: [id])
+  giftId         String
+  gift           Gift           @relation(fields: [giftId], references: [id])
+  barcode        String
+  email          String
+  customerGuid   String
+  externalGiftId String
+  box            Int
+  consentText    String
+  consentVersion String
+  consentAt      DateTime       @default(now()) @db.Timestamptz
+  requestKey     String
+  requestHash    String
+  status         String
+  assignedAt     DateTime?      @db.Timestamptz
+  createdAt      DateTime       @default(now()) @db.Timestamptz
+  job            AssignmentJob?
+
+  @@unique([sessionId, requestKey])
+}
+
+model AssignmentJob {
+  id             String          @id
+  claimId        String          @unique
+  claim          AssignmentClaim @relation(fields: [claimId], references: [id])
+  idempotencyKey String          @unique
+  status         String          @default("pending")
+  attempts       Int             @default(0)
+  nextAttemptAt  DateTime        @default(now()) @db.Timestamptz
+  leaseUntil     DateTime?       @db.Timestamptz
+  leaseToken     String?
+  safeError      String?
+
+  @@index([status, nextAttemptAt], map: "assignment_job_ready")
+}
+
+model AuditEvent {
+  id            BigInt   @id @default(autoincrement())
+  createdAt     DateTime @default(now()) @db.Timestamptz
+  eventType     String
+  correlationId String
+  metadata      Json     @db.JsonB
+
+  @@index([createdAt], map: "audit_created")
+}
+
+model MockAssignment {
+  key      String  @id
+  payload  String
+  response Json    @db.JsonB
+  giftId   String? @unique
 }

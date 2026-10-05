@@ -1,5 +1,5 @@
 export const demoNotice =
-  "Demonstracinis režimas: pirkimai tikrinami pagal testinius duomenis, el. laiškai nesiunčiami.";
+  "Demonstracinis režimas: pirkimo tikrinimas ir dovanos priskyrimas imituojami. Tikri pirkimai netikrinami, el. laiškai nesiunčiami.";
 export function integer(name: string, fallback: number, max = 1000000) {
   const n = Number(process.env[name] ?? fallback);
   if (!Number.isInteger(n) || n < 1 || n > max)

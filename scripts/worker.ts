@@ -1,4 +1,4 @@
-import { processOne } from "../src/lib/outbox";
+import { processAssignment } from "../src/lib/assignment-worker";
 import { db } from "../src/lib/db";
 import { integer, participationAllowed } from "../src/lib/config";
 let stop = false;
@@ -9,13 +9,13 @@ async function main() {
     throw new Error("Darbuotojas sustabdytas: integracijos neparuoštos.");
   while (!stop) {
     try {
-      const worked = await processOne();
+      const worked = await processAssignment();
       if (!worked)
         await new Promise((r) =>
           setTimeout(r, integer("WORKER_POLL_MS", 1000, 60000)),
         );
     } catch {
-      console.error("Siuntimo užduoties nepavyko apdoroti.");
+      console.error("Dovanos priskyrimo užduoties nepavyko apdoroti.");
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
