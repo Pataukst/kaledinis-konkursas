@@ -22,6 +22,7 @@ export type Reservation = {
   expiresAt: Date;
 };
 export type NewClaim = {
+  box: number;
   id: string;
   reservationId: string;
   sessionId: string;
@@ -57,12 +58,11 @@ export const publicReservation = (r: Reservation) => ({
   validationId: r.validationId,
   expiresAt: r.expiresAt.toISOString(),
 });
-export const publicResult = (c: NewClaim) => ({
-  id: c.id,
-  email: c.email,
-  status: c.status,
-  delayed: c.status === "PENDING_ASSIGNMENT",
-});
+export async function publicResult(c: NewClaim, tx: Tx) {
+  const gift = await tx.gift.findUniqueOrThrow({ where: { id: c.giftId }, select: { title: true } });
+  return { id: c.id, email: c.email, status: c.status,
+    delayed: c.status === "PENDING_ASSIGNMENT", giftTitle: gift.title, box: c.box };
+}
 async function release(tx: Tx, r: Reservation, status: "EXPIRED" | "RELEASED") {
   if (r.status !== "RESERVED") return;
   const gift = await tx.gift.findUniqueOrThrow({
@@ -124,7 +124,7 @@ export async function flowState(sessionId: string) {
     >`SELECT * FROM "AssignmentClaim" WHERE "sessionId"=${sessionId} AND status<>'REJECTED' ORDER BY "createdAt" DESC LIMIT 1`;
     if (claims[0])
       return {
-        claim: publicResult(claims[0]),
+        claim: await publicResult(claims[0], tx),
         eligible: false,
         reservation: null,
         serverTime: now.toISOString(),
@@ -379,7 +379,7 @@ export async function submitReservation(
       if (prior[0]) {
         if (prior[0].requestHash !== requestHash)
           throw new AppError(409, "Pakartotos užklausos duomenys nesutampa.");
-        return publicResult(prior[0]);
+        return publicResult(prior[0], tx);
       }
       const rows = await tx.$queryRaw<
         Reservation[]
@@ -430,12 +430,9 @@ export async function submitReservation(
         reservedAt: r.reservedAt,
         expiresAt: r.expiresAt,
       });
-      return {
-        id,
-        email: input.email,
-        status: "PENDING_ASSIGNMENT",
-        delayed: true,
-      };
+      const gift = await tx.gift.findUniqueOrThrow({ where: { id: r.giftId }, select: { title: true } });
+      return { id, email: input.email, status: "PENDING_ASSIGNMENT", delayed: true,
+        giftTitle: gift.title, box: input.box };
     });
   } catch (e) {
     await audit(db, "submission.rejected", {
@@ -452,3 +449,4 @@ export async function submitReservation(
     );
   }
 }
+
