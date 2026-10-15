@@ -37,6 +37,14 @@ export async function checkPurchase(
   if (input.barcode === "TIMEOUT") return { kind: "error", code: "timeout" };
   if (input.barcode === "UNAVAILABLE")
     return { kind: "error", code: "unavailable" };
+  if (/^DEMO-ORDER-\d{3}$/.test(input.barcode)) {
+    const orders = await db.$queryRaw<{ barcode: string }[]>`
+      SELECT barcode FROM "DemoOrder"
+      WHERE barcode=${input.barcode} AND "purchaseDate"=${input.activationDate}`;
+    return orders.length
+      ? { kind: "valid", customerGuid: stableGuid(input.barcode) }
+      : { kind: "invalid" };
+  }
   const response: unknown =
     input.barcode === "MALFORMED"
       ? { validation: true, customerGuid: "" }
