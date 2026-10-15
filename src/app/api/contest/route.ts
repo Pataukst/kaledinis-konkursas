@@ -8,7 +8,7 @@ import {
   jsonBody,
   AppError,
 } from "@/lib/security";
-import { participationAllowed, isMock, consent } from "@/lib/config";
+import { participationAllowed, isMock, consent, mockEnvironmentAllowed } from "@/lib/config";
 import {
   flowState,
   invalidateFlow,
@@ -28,7 +28,7 @@ function customerIp(req: Request) {
     return ip;
   }
   if (
-    process.env.NODE_ENV !== "production" &&
+    mockEnvironmentAllowed() &&
     process.env.PURCHASE_ADAPTER === "mock"
   )
     return "127.0.0.1";

@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: kaledinis-konkursas
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm run start:hosted
+    envVars:
+      - key: NODE_VERSION
+        value: 24.21.0
+      - key: HOSTED_DEMO
+        value: "true"
+      - key: PURCHASE_ADAPTER
+        value: mock
+      - key: DELIVERY_ADAPTER
+        value: mock
+      - key: MOCK_ASSIGNMENT
+        value: ok
+      - key: EXTERNAL_IDEMPOTENCY_CONFIRMED
+        value: "true"
+      - key: WORKER_POLL_MS
+        value: "10000"
+      - key: SITE_PASSWORD
+        generateValue: true
+      - key: AUDIT_HMAC_KEY
+        generateValue: true
+      - key: DEMO_ADMIN_PASSWORD
+        generateValue: true
+      - key: DEMO_ADMIN_USERNAME
+        value: demo-admin
+      - key: DATABASE_URL
+        sync: false
+      - key: MIGRATION_DATABASE_URL
+        sync: false

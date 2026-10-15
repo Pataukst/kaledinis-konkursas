@@ -1,9 +1,8 @@
 import { db } from "../src/lib/db";
+import { participationAllowed } from "../src/lib/config";
 
 async function main() {
-  if (process.env.NODE_ENV === "production" ||
-      process.env.PURCHASE_ADAPTER !== "mock" ||
-      process.env.DELIVERY_ADAPTER !== "mock")
+  if (!participationAllowed())
     throw new Error("Team fixtures require the local mock environment.");
   await db.$transaction(async (tx) => {
     for (let i = 1; i <= 100; i++) {
