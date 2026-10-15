@@ -199,6 +199,13 @@ model AuditEvent {
   @@index([createdAt], map: "audit_created")
 }
 
+model DemoOrder {
+  barcode      String @id
+  purchaseDate String
+  productCode  String
+  productTitle String
+}
+
 model HttpRequestLog {
   id           String   @id
   createdAt    DateTime @default(now()) @db.Timestamptz

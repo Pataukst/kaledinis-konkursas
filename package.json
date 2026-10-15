@@ -13,6 +13,7 @@
     "worker:cleanup": "tsx --env-file-if-exists=.env scripts/cleanup.ts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/admin.ts",
     "seed:dev": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "seed:team": "tsx --env-file-if-exists=.env scripts/seed-team.ts",
     "test": "tsx --env-file-if-exists=.env --test tests/*.test.ts",
     "test:db": "tsx --env-file-if-exists=.env --test --test-concurrency=1 tests/database.test.ts tests/reservations.test.ts",
     "test:browser": "tsx --env-file-if-exists=.env tests/reservation-smoke.ts",
