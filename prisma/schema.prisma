@@ -199,6 +199,19 @@ model AuditEvent {
   @@index([createdAt], map: "audit_created")
 }
 
+model HttpRequestLog {
+  id           String   @id
+  createdAt    DateTime @default(now()) @db.Timestamptz
+  method       String
+  path         String
+  status       Int
+  durationMs   Int
+  requestBody  Json     @db.JsonB
+  responseBody Json     @db.JsonB
+
+  @@index([createdAt], map: "http_request_log_created")
+}
+
 model MockAssignment {
   key      String  @id
   payload  String
