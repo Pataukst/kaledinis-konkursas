@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build --webpack",
     "start": "next start",
+    "start:hosted": "node scripts/start-hosted.mjs",
     "worker": "tsx --env-file-if-exists=.env scripts/worker.ts",
     "worker:cleanup": "tsx --env-file-if-exists=.env scripts/cleanup.ts",
     "admin:create": "tsx --env-file-if-exists=.env scripts/admin.ts",

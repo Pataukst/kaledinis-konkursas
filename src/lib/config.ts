@@ -20,9 +20,16 @@ export function isMock() {
   );
 }
 // Real adapters remain deliberately unconfigured until approved API mappings are implemented.
+export function mockEnvironmentAllowed() {
+  return process.env.NODE_ENV !== "production" || (
+    process.env.HOSTED_DEMO === "true" &&
+    (process.env.SITE_PASSWORD?.length ?? 0) >= 14 &&
+    (process.env.APP_ORIGIN || "").startsWith("https://")
+  );
+}
 export function participationAllowed() {
   return (
-    process.env.NODE_ENV !== "production" &&
+    mockEnvironmentAllowed() &&
     process.env.PURCHASE_ADAPTER === "mock" &&
     process.env.DELIVERY_ADAPTER === "mock"
   );

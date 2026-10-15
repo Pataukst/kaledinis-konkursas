@@ -34,6 +34,5 @@ the demo purchase; the contest gift is randomly chosen from available
 inventory and is not determined by that purchased product or selected box.
 No real purchases are checked and no emails are sent.
 
-The local changes do not publish the website. Hosted demo participation
-and worker setup still require hosting configuration; existing production
-mock restrictions remain in place.
+For hosted demo participation and worker setup, follow `RENDER_NEON.md`.
+Production mocks require explicit protected hosted-demo configuration.
