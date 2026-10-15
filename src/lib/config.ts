@@ -9,8 +9,8 @@ export function integer(name: string, fallback: number, max = 1000000) {
 export function consent() {
   return {
     text:
-      process.env.CONSENT_TEXT || "Sutinku gauti naujienlaiškius el. paštu.",
-    version: process.env.CONSENT_VERSION || "dev-1",
+      process.env.CONSENT_TEXT || "Susipažinau su privatumo politika ir sutinku gauti naujienlaiškius el. paštu.",
+    version: process.env.CONSENT_VERSION || "privacy-newsletter-2026-10-15",
   };
 }
 export function isMock() {
@@ -34,3 +34,4 @@ export function participationAllowed() {
     process.env.DELIVERY_ADAPTER === "mock"
   );
 }
+

@@ -1,5 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import ContestModal from "./contest-modal";
+import SantaElephant from "./santa-elephant";
+import DeliveryElephant from "./delivery-elephant";
+import privacyPolicy from "@/content/privacy-policy.json";
 import {
   claimSchema,
   barcodeLabels,
@@ -13,7 +17,7 @@ import {
   userErrorMessage,
 } from "@/lib/client-errors";
 type Reservation = { id: string; validationId: string; expiresAt: string };
-type Result = { id: string; email: string; delayed: boolean; status: string };
+type Result = { id: string; email: string; delayed: boolean; status: string; giftTitle: string; box: number };
 export default function Contest({
   organiser,
   rulesUrl,
@@ -23,9 +27,11 @@ export default function Contest({
   rulesUrl: string;
   privacyUrl: string;
 }) {
+  const [opening, setOpening] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const [step, setStep] = useState(1),
     [reservation, setReservation] = useState<Reservation | null>(null),
-    [remaining, setRemaining] = useState(0),
     [timeOffset, setTimeOffset] = useState(0),
     [values, setValues] = useState<Record<string, string>>({}),
     [box, setBox] = useState(0),
@@ -103,7 +109,26 @@ export default function Contest({
   }, []);
   useEffect(() => {
     document.getElementById("step-title")?.focus();
+    setDetailsOpen(false);
+    setOpening(false);
   }, [step]);
+  useEffect(() => {
+    if (!opening) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = setTimeout(() => {
+      setOpening(false);
+      setDetailsOpen(true);
+    }, reduced ? 0 : 1500);
+    return () => clearTimeout(timer);
+  }, [opening]);
+  function chooseBox(n: number) {
+    if (opening || busy) return;
+    setBox(n);
+    setConsent(false);
+    setFields({});
+    setError("");
+    setOpening(true);
+  }
   useEffect(() => {
     if (step !== 2 || !reservation) return;
     let checking = false;
@@ -114,7 +139,6 @@ export default function Contest({
           (Date.parse(reservation.expiresAt) - Date.now() - timeOffset) / 1000,
         ),
       );
-      setRemaining(seconds);
       if (!seconds && !checking) {
         checking = true;
         void load();
@@ -212,9 +236,6 @@ export default function Contest({
       <div className="stars" aria-hidden="true">
         ✦ · ✧ · ✦
       </div>
-      <header className="brand">
-        <span aria-hidden="true">✧</span> Kalėdų staigmena
-      </header>
       {settings.mock && <aside className="demo">{demoNotice}</aside>}
       <div className="intro">
         <p className="eyebrow">ŠIEK TIEK KALĖDŲ MAGIJOS</p>
@@ -226,20 +247,7 @@ export default function Contest({
         <p>Įsigijote dovaną? Pakvieskite šventinį džiaugsmą ir į savo namus.</p>
       </div>
       <section className="card" aria-label="Dalyvavimas konkurse">
-        <ol className="progress" aria-label="Trys dalyvavimo žingsniai">
-          {["Pirkimo duomenys", "Jūsų dovana", "Ačiū"].map((s, i) => (
-            <li
-              key={s}
-              className={step >= i + 1 ? "active" : ""}
-              aria-current={step === i + 1 ? "step" : undefined}
-            >
-              <span>{step > i + 1 ? "✓" : i + 1}</span>
-              <small>{s}</small>
-            </li>
-          ))}
-        </ol>
         <div className="form-content">
-          <p className="eyebrow">{step} ŽINGSNIS IŠ 3</p>
           <h2 id="step-title" tabIndex={-1}>
             {step === 1
               ? "Jūsų pirkimo duomenys"
@@ -247,7 +255,7 @@ export default function Contest({
                 ? "Pasirinkite savo kalėdinę dovaną"
                 : "Ačiū, kad dalyvaujate!"}
           </h2>
-          {error && (
+          {error && !detailsOpen && (
             <div className="error" role="alert">
               {error}
             </div>
@@ -309,22 +317,10 @@ export default function Contest({
           )}
           {step === 2 && (
             <>
+              <SantaElephant />
               <p>Penkios dėžutės. Viena šventinė staigmena jums.</p>
-              {reservation && (
-                <p role="status">
-                  Dovana rezervuota iki{" "}
-                  {new Intl.DateTimeFormat("lt-LT", {
-                    timeZone: "Europe/Vilnius",
-                    dateStyle: "short",
-                    timeStyle: "short",
-                  }).format(new Date(reservation.expiresAt))}
-                  . Liko {Math.floor(remaining / 3600)} val.{" "}
-                  {Math.floor((remaining % 3600) / 60)} min. {remaining % 60}{" "}
-                  sek.
-                </p>
-              )}
               <div
-                className="presents"
+                className={`presents ${opening ? "opening" : ""}`}
                 role="group"
                 aria-label="Pasirinkite vieną iš penkių dovanų"
               >
@@ -334,15 +330,14 @@ export default function Contest({
                     className={`present p${n} ${box === n ? "chosen" : ""}`}
                     aria-label={`Dovana ${n}`}
                     aria-pressed={box === n}
-                    disabled={busy}
-                    onClick={() => setBox(n)}
+                    disabled={busy || opening}
+                    onClick={() => chooseBox(n)}
                   >
                     <span className="gift" aria-hidden="true">
                       <span className="bow">∞</span>
                       <span className="lid" />
                       <span className="ribbon" />
                     </span>
-                    <span className="gift-label">Dovana {n}</span>
                     {box === n && (
                       <span className="tick" aria-hidden="true">
                         ✓
@@ -351,7 +346,13 @@ export default function Contest({
                   </button>
                 ))}
               </div>
-              {box > 0 && (
+              {opening && <div className="fireworks" aria-hidden="true">{Array.from({ length: 24 }, (_, i) =>
+                <i key={i} style={{ "--angle": `${i * 15}deg`, "--distance": `${95 + i % 4 * 22}px`, "--delay": `${i % 3 * 80}ms` } as React.CSSProperties} />)}</div>}
+              <p className="selection-status" role="status">{opening ? "Dėžutė atsidaro…" : box ? "Norėdami tęsti, spustelėkite pasirinktą dovaną." : "Spustelėkite dėžutę ir atraskite Kalėdų magiją."}</p>
+              {box > 0 && detailsOpen && (
+                <ContestModal title="Dar vienas žingsnis iki dovanos" onClose={() => setDetailsOpen(false)} busy={busy}>
+                <p>Dovana jau pakeliui į jūsų el. pašto dėžutę</p>
+                {error && <div className="error" role="alert">{error}</div>}
                 <form onSubmit={submit} noValidate>
                   <div className="field">
                     <label htmlFor="email">Gavėjo el. paštas</label>
@@ -377,8 +378,10 @@ export default function Contest({
                       </p>
                     )}
                   </div>
-                  <label className="check">
+                  <div className="check">
                     <input
+                      id="contest-consent"
+                      aria-labelledby="contest-consent-text"
                       type="checkbox"
                       checked={consent}
                       disabled={busy}
@@ -391,25 +394,30 @@ export default function Contest({
                         fields.consent ? "consent-error" : undefined
                       }
                     />
-                    <span>{settings.consent.text}</span>
-                  </label>
+                    <span id="contest-consent-text">{settings.consent.text.includes("privatumo politika") ? <>
+                      <label htmlFor="contest-consent">{settings.consent.text.split("privatumo politika")[0]}</label>
+                      <a href={privacyPolicy.source} onClick={e => { e.preventDefault(); setPrivacyOpen(true); }}>privatumo politika</a>
+                      <label htmlFor="contest-consent">{settings.consent.text.split("privatumo politika").slice(1).join("privatumo politika")}</label>
+                    </> : <label htmlFor="contest-consent">{settings.consent.text}</label>}</span>
+                  </div>
                   {fields.consent && (
                     <p id="consent-error" className="field-error">
                       {fields.consent}
                     </p>
                   )}
                   <div className="actions">
-                    <button type="button" onClick={back} disabled={busy}>
-                      Atgal
+                    <button type="button" onClick={() => setDetailsOpen(false)} disabled={busy}>
+                      Keisti dėžutę
                     </button>
                     <button className="primary" disabled={busy}>
                       {busy ? "Registruojama…" : "Gauti dovaną"}
                     </button>
                   </div>
                 </form>
+                </ContestModal>
               )}
-              {!box && (
-                <button onClick={back} disabled={busy}>
+              {!detailsOpen && (
+                <button onClick={back} disabled={busy || opening}>
                   Atgal
                 </button>
               )}
@@ -417,28 +425,9 @@ export default function Contest({
           )}
           {step === 3 && result && (
             <div className="result">
-              <span aria-hidden="true" className="seal">
-                ✦
-              </span>
-              <p>
-                {result.status === "ASSIGNED"
-                  ? "Dovana priskirta. Gavėjo el. paštas išsaugotas."
-                  : result.status === "REJECTED"
-                    ? "Dovanos priskyrimas atmestas. Atnaujinkite būseną ir bandykite su nauja registracija."
-                    : "Jūsų registracija išsaugota. Dovanos priskyrimas tikrinamas."}
-              </p>
-              {settings.mock && (
-                <p>Tai demonstracija. Tikras el. laiškas nebus siunčiamas.</p>
-              )}
-              {result.delayed && (
-                <p role="status">
-                  Dovanos priskyrimo būsena bus atnaujinta gavus patvirtinimą.
-                </p>
-              )}
+              <DeliveryElephant box={result.box || box} />
+              <p className="delivery-message">Sveikiname, jūsų dovana <strong>{result.giftTitle}</strong> jau pakeliui į jūsų pašto dėžutę</p>
               <p className="muted">Linkime jaukių švenčių!</p>
-              <button onClick={() => void load()} disabled={busy}>
-                Atnaujinti būseną
-              </button>
             </div>
           )}
         </div>
@@ -448,20 +437,21 @@ export default function Contest({
         </div>
       </section>
       <footer>
-        <p>{organiser}</p>
+        {organiser && <p>{organiser}</p>}
         <div>
-          {rulesUrl ? (
+          {rulesUrl && (
             <a href={rulesUrl}>Konkurso taisyklės</a>
-          ) : (
-            <span>Taisyklės: kūrimo vietaženklis</span>
           )}
-          {privacyUrl ? (
-            <a href={privacyUrl}>Privatumo informacija</a>
-          ) : (
-            <span>Privatumo informacija: kūrimo vietaženklis</span>
-          )}
+          <a href={privacyUrl || privacyPolicy.source} onClick={e => { e.preventDefault(); setPrivacyOpen(true); }}>Privatumo politika</a>
         </div>
       </footer>
+      {privacyOpen && <ContestModal title="Privatumo politika" wide closeOnBackdrop onClose={() => setPrivacyOpen(false)}>
+        <article className="policy-content">{privacyPolicy.sections.map((section, i) => <section key={i}>
+          <h3>{section.title}</h3><div dangerouslySetInnerHTML={{ __html: section.html }} />
+        </section>)}</article>
+        <button className="primary" onClick={() => setPrivacyOpen(false)}>Grįžti</button>
+      </ContestModal>}
     </main>
   );
 }
+
