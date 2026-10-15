@@ -1,4 +1,5 @@
 import "server-only";
+import { logContestRequest } from "@/lib/http-log";
 import {
   endpoint,
   visitor,
@@ -33,8 +34,8 @@ function customerIp(req: Request) {
     return "127.0.0.1";
   throw new AppError(503, "Pirkimo tikrinimo ryšys nesukonfigūruotas.");
 }
-export async function GET() {
-  return endpoint(async () => {
+export async function GET(req: Request) {
+  return logContestRequest(req, () => endpoint(async () => {
     await rateLimit("bootstrap:global", 1200);
     const s = await visitor(true);
     return {
@@ -44,10 +45,10 @@ export async function GET() {
       maxLength: 128,
       ...(await flowState(s.id)),
     };
-  });
+  }));
 }
 export async function POST(req: Request) {
-  return endpoint(async () => {
+  return logContestRequest(req, () => endpoint(async () => {
     await originCheck(req);
     const s = await visitor();
     await rateLimit(`contest:${s.id}`, 20);
@@ -66,5 +67,5 @@ export async function POST(req: Request) {
       return validateAndReserve(s.id, body.input, customerIp(req));
     if (body.action === "claim") return submitReservation(s.id, body.input);
     throw new AppError(400, "Netinkama užklausa.");
-  });
+  }));
 }
